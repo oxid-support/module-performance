@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace OxidSupport\ModulePerformance\Module\Cache;
 
+use OxidEsales\EshopCommunity\Internal\Framework\Module\Cache\ModuleCacheServiceInterface;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Dao\ModuleConfigurationDaoInterface;
+use OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ActiveModulesDataProviderInterface;
 use OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface;
 use OxidEsales\Twig\Resolver\TemplateChain\TemplateChainResolverInterface;
 use Symfony\Component\Console\Command\Command;
@@ -18,8 +20,8 @@ use Twig\Loader\FilesystemLoader;
  *
  * Usage:
  *   vendor/bin/oe-console oxs:perf:warmup               # all caches (default)
- *   vendor/bin/oe-console oxs:perf:warmup --module-settings
- *   vendor/bin/oe-console oxs:perf:warmup --template-chain
+ *   vendor/bin/oe-console oxs:perf:warmup --modules
+ *   vendor/bin/oe-console oxs:perf:warmup --templates
  *
  * Run this after module activation/deactivation or settings changes.
  * The command runs in its own process — no interference with the DI
@@ -32,6 +34,8 @@ class WarmupModuleConfigurationCacheCommand extends Command
         private TemplateChainResolverInterface $chainResolver,
         private FilesystemLoader $loader,
         private ContextInterface $context,
+        private ActiveModulesDataProviderInterface $activeModulesDataProvider,
+        private ModuleCacheServiceInterface $moduleCacheService,
     ) {
         parent::__construct();
     }
@@ -40,50 +44,62 @@ class WarmupModuleConfigurationCacheCommand extends Command
     {
         $this->setName('oxs:perf:warmup');
         $this->setDescription('Rebuild persistent caches for oxid-support/module-performance');
-        $this->addOption('module-settings', null, InputOption::VALUE_NONE, 'Warm up module configuration YAML cache only');
-        $this->addOption('template-chain', null, InputOption::VALUE_NONE, 'Warm up template chain cache only');
+        $this->addOption('modules', null, InputOption::VALUE_NONE, 'Warm up module caches only (configuration, metadata, settings)');
+        $this->addOption('templates', null, InputOption::VALUE_NONE, 'Warm up template caches only (chain, map)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $moduleSettings = $input->getOption('module-settings');
-        $templateChain = $input->getOption('template-chain');
+        $modules = $input->getOption('modules');
+        $templates = $input->getOption('templates');
 
         // No specific option = warm up everything
-        $all = !$moduleSettings && !$templateChain;
+        $all = !$modules && !$templates;
 
-        if ($all || $moduleSettings) {
-            $this->warmupModuleSettings($output);
+        if ($all || $modules) {
+            $this->warmupModules($output);
         }
 
-        if ($all || $templateChain) {
-            $this->warmupTemplateChain($output);
+        if ($all || $templates) {
+            $this->warmupTemplates($output);
         }
 
         return Command::SUCCESS;
     }
 
-    /**
-     * Reads all module YAML configurations via the DAO, populating
-     * FilesystemModuleConfigurationCache. At shutdown, persist() writes to disk.
-     */
-    private function warmupModuleSettings(OutputInterface $output): void
+    private function warmupModules(OutputInterface $output): void
     {
         $shopId = $this->context->getCurrentShopId();
         $configs = $this->dao->getAll($shopId);
 
         $output->writeln(sprintf(
-            'Module settings: cached <info>%d</info> configurations',
+            'Module configuration: cached <info>%d</info> YAML configs',
             count($configs)
+        ));
+
+        $this->activeModulesDataProvider->getModulePaths();
+        $this->activeModulesDataProvider->getControllers();
+        $this->activeModulesDataProvider->getClassExtensions();
+        $output->writeln('Module metadata: cached paths, controllers, class extensions');
+
+        $settingsCount = 0;
+        foreach ($configs as $moduleConfiguration) {
+            foreach ($moduleConfiguration->getModuleSettings() as $setting) {
+                $cacheKey = $moduleConfiguration->getId() . '-setting-' . $setting->getName();
+                $this->moduleCacheService->put($cacheKey, $shopId, ['value' => $setting->getValue()]);
+                $settingsCount++;
+            }
+        }
+        $output->writeln(sprintf(
+            'Module settings: cached <info>%d</info> individual settings',
+            $settingsCount
         ));
     }
 
-    /**
-     * Resolves template chains for all known templates, populating
-     * PersistentTemplateChainResolver. At shutdown, persist() writes to disk.
-     */
-    private function warmupTemplateChain(OutputInterface $output): void
+    private function warmupTemplates(OutputInterface $output): void
     {
+        $output->writeln('Template map: rebuilt');
+
         $templates = $this->discoverTemplates();
         $resolved = 0;
 

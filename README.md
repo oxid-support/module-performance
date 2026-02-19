@@ -13,30 +13,25 @@ Reduces TTFB with 30 active modules from ~4.8s to ~0.7s (after warmup).
 
 ## What gets cached
 
-### 1. Module Configuration
-Serializes all YAML module configurations into a single cache file.
-Eliminates ~600ms of YAML parsing per request with 30 modules.
+### Modules
+- **Configuration** — Serializes all YAML module configurations into a single cache file. Eliminates ~600ms of YAML parsing per request with 30 modules. File: `var/cache/modules/{shopId}/oxs_perf_module_configurations`
+- **Metadata** — Caches active module paths, controllers and class extensions via ModuleCacheService. Avoids re-resolving module metadata on every request.
+- **Settings** — Per-setting cache for module configuration values. Invalidates on save and dispatches `SettingChangedEvent`.
 
-File: `var/cache/modules/{shopId}/oxs_perf_module_configurations`
-
-### 2. Template Chain
-Persists chain resolution results (lastChild, parent, hasParent)
-via ModuleCacheService. Eliminates iterating over all modules x templates.
-
-Files: `var/cache/modules/{shopId}/oxs_perf_lastchild.txt` etc.
-
-Additionally, two in-memory decorators prevent redundant computation within a single request:
-
-- **CachedModulesTemplateDirectoryResolver** — `getTemplateDirectories()` is called multiple times per request. The decorator stores the result and returns it directly on subsequent calls.
-- **CachedTemplateTypeFactory** — `createFromTemplateName()` is called for every template. Instead of recalculating each time, the result is cached per template name.
+### Templates
+- **Chain** — Persists chain resolution results (lastChild, parent, hasParent) via ModuleCacheService. Eliminates iterating over all modules x templates. Files: `var/cache/modules/{shopId}/oxs_perf_lastchild.txt` etc.
+- **Map** — Pre-computed map of all template paths, eliminating repeated directory scanning. Built automatically on first request. File: `source/tmp/template_map_shop_1.php`
+- **Directory Resolver** — In-memory cache for `getTemplateDirectories()`, which is called multiple times per request.
+- **Type Factory** — In-memory cache for `createFromTemplateName()`, which is called for every template.
+- **Twig Filters** — Exposes PHP functions (`parse_url`, `oxNew`, `strtotime`, `is_array`, `urlencode`, `addslashes`) as native Twig filters. Includes an optimized `getimagesize` that detects local files and uses filesystem instead of network access.
 
 ## Commands
 
 | Command | Description |
 |---|---|
 | `oxs:perf:warmup` | Warm up all caches (default) |
-| `oxs:perf:warmup --module-settings` | YAML configuration cache only |
-| `oxs:perf:warmup --template-chain` | Template chain cache only |
+| `oxs:perf:warmup --modules` | Module caches only (configuration, metadata, settings) |
+| `oxs:perf:warmup --templates` | Template caches only (chain, map) |
 
 For multishop setups, pass `--shop-id` to warm up a specific sub-shop:
 
