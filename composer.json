@@ -1,0 +1,19 @@
+{
+    "name": "oxid-support/module-performance",
+    "description": "Persistent caching for module configuration and template chain resolution in OXID eShop",
+    "type": "oxideshop-module",
+    "license": "proprietary",
+    "autoload": {
+        "psr-4": {
+            "OxidSupport\\ModulePerformance\\": ""
+        }
+    },
+    "require": {
+        "php": ">=8.1"
+    },
+    "extra": {
+        "oxideshop": {
+            "target-directory": "oxid-support/module-performance"
+        }
+    }
+}

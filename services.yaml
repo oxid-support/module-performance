@@ -1,0 +1,50 @@
+services:
+  _defaults:
+    autowire: false
+    autoconfigure: false
+    public: false
+
+  # 1. Persistent chain resolver (wraps everything above it)
+  OxidSupport\ModulePerformance\Twig\Resolver\TemplateChain\PersistentTemplateChainResolver:
+    decorates: OxidEsales\Twig\Resolver\TemplateChain\TemplateChainResolverInterface
+    decoration_priority: -10
+    arguments:
+      $inner: '@.inner'
+      $moduleCacheService: '@OxidEsales\EshopCommunity\Internal\Framework\Module\Cache\ModuleCacheServiceInterface'
+      $context: '@OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface'
+      $logger: '@Psr\Log\LoggerInterface'
+
+  # 2. Cached module directory resolver (memoize per request)
+  OxidSupport\ModulePerformance\Twig\Resolver\CachedModulesTemplateDirectoryResolver:
+    decorates: OxidEsales\Twig\Resolver\ModulesTemplateDirectoryResolver
+    arguments:
+      $inner: '@.inner'
+
+  # 3. Cached template type factory (memoize per request)
+  OxidSupport\ModulePerformance\Twig\Resolver\TemplateChain\CachedTemplateTypeFactory:
+    decorates: OxidEsales\Twig\Resolver\TemplateChain\TemplateType\TemplateTypeFactoryInterface
+    arguments:
+      $inner: '@.inner'
+
+  # 4. Persistent module configuration cache (avoids YAML re-parsing per request)
+  #    Also an event subscriber (priority -100) that invalidates on module changes.
+  OxidSupport\ModulePerformance\Module\Cache\FilesystemModuleConfigurationCache:
+    decorates: OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Cache\ModuleConfigurationCacheInterface
+    arguments:
+      $inner: '@.inner'
+      $context: '@OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface'
+      $logger: '@Psr\Log\LoggerInterface'
+    tags:
+      - { name: kernel.event_subscriber }
+
+  # 5. Console command: oxs:perf:warmup
+  #    Rebuilds module config cache (--module-settings) and/or
+  #    template chain cache (--template-chain). Default: both.
+  OxidSupport\ModulePerformance\Module\Cache\WarmupModuleConfigurationCacheCommand:
+    arguments:
+      $dao: '@OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Dao\ModuleConfigurationDaoInterface'
+      $chainResolver: '@OxidEsales\Twig\Resolver\TemplateChain\TemplateChainResolverInterface'
+      $loader: '@twig.loader.filesystem'
+      $context: '@OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface'
+    tags:
+      - { name: console.command }
