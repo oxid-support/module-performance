@@ -157,15 +157,6 @@ class FilesystemModuleConfigurationCache implements ModuleConfigurationCacheInte
         }
     }
 
-    /**
-     * Persists the in-memory cache to disk (called via register_shutdown_function).
-     *
-     * Skips when:
-     * - No data changed ($dirty = false)
-     * - Cache was invalidated during this process ($invalidated = true)
-     *
-     * Uses atomic write (tmp + rename) to prevent corruption on concurrent access.
-     */
     public function persist(): void
     {
         if (!$this->dirty || $this->invalidated) {

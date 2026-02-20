@@ -16,18 +16,21 @@ services:
       $moduleCacheService: '@OxidEsales\EshopCommunity\Internal\Framework\Module\Cache\ModuleCacheServiceInterface'
       $context: '@OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface'
       $logger: '@Psr\Log\LoggerInterface'
+      $moduleSettingService: '@OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface'
 
   # 2. Cached module directory resolver (memoize per request)
   OxidSupport\ModulePerformance\Twig\Resolver\CachedModulesTemplateDirectoryResolver:
     decorates: OxidEsales\Twig\Resolver\ModulesTemplateDirectoryResolver
     arguments:
       $inner: '@.inner'
+      $moduleSettingService: '@OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface'
 
   # 3. Cached template type factory (memoize per request)
   OxidSupport\ModulePerformance\Twig\Resolver\TemplateChain\CachedTemplateTypeFactory:
     decorates: OxidEsales\Twig\Resolver\TemplateChain\TemplateType\TemplateTypeFactoryInterface
     arguments:
       $inner: '@.inner'
+      $moduleSettingService: '@OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface'
 
   # 4. Persistent module configuration cache (avoids YAML re-parsing per request)
   #    Also an event subscriber (priority -100) that invalidates on module changes.
@@ -54,7 +57,14 @@ services:
     tags:
       - { name: console.command }
 
-  # 6. Twig-Filter: PHP-Funktionen + optimiertes getimagesize
+  # 6. Widget-Output-Cache (caches static widget HTML)
+  OxidSupport\ModulePerformance\Twig\Extensions\CachedIncludeWidgetLogic:
+    decorates: OxidEsales\EshopCommunity\Internal\Transition\Adapter\TemplateLogic\IncludeWidgetLogic
+    arguments:
+      $inner: '@.inner'
+      $moduleSettingService: '@OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface'
+
+  # 7. Twig-Filter: PHP-Funktionen + optimiertes getimagesize
   OxidSupport\ModulePerformance\Twig\Extensions\Filters\PhpFunctionsPerformanceExtension:
     tags: ['twig.extension']
 
@@ -62,8 +72,9 @@ services:
   twig.loader.filesystem:
     class: OxidSupport\ModulePerformance\Twig\Loader\FilesystemLoader
     arguments:
-      - '@OxidEsales\Twig\Resolver\TemplateDirectoryResolverInterface'
-      - '%oxid_esales.templating.template_map_file%'
+      $templateDirectoryResolver: '@OxidEsales\Twig\Resolver\TemplateDirectoryResolverInterface'
+      $templateMapFile: '%oxid_esales.templating.template_map_file%'
+      $moduleSettingService: '@OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface'
     tags: ['twig.loader']
 
   # 8. Cached Modul-Metadaten (Pfade, Controller, Class-Extensions)
@@ -71,11 +82,12 @@ services:
     class: OxidSupport\ModulePerformance\Internal\Framework\Module\Facade\ActiveModulesDataProvider
     public: true
     arguments:
-      - '@OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Dao\ModuleConfigurationDaoInterface'
-      - '@OxidEsales\EshopCommunity\Internal\Framework\Module\Path\ModulePathResolverInterface'
-      - '@OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface'
-      - '@OxidEsales\EshopCommunity\Internal\Framework\Module\Cache\ModuleCacheServiceInterface'
-      - '@OxidEsales\EshopCommunity\Internal\Framework\Module\Setup\Service\ActiveClassExtensionChainResolverInterface'
+      $moduleConfigurationDao: '@OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Dao\ModuleConfigurationDaoInterface'
+      $modulePathResolver: '@OxidEsales\EshopCommunity\Internal\Framework\Module\Path\ModulePathResolverInterface'
+      $context: '@OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface'
+      $moduleCacheService: '@OxidEsales\EshopCommunity\Internal\Framework\Module\Cache\ModuleCacheServiceInterface'
+      $activeClassExtensionChainResolver: '@OxidEsales\EshopCommunity\Internal\Framework\Module\Setup\Service\ActiveClassExtensionChainResolverInterface'
+      $moduleSettingService: '@OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface'
 
   # 9. Per-Setting-Cache mit Event-Invalidierung
   OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface:

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace OxidSupport\ModulePerformance\Twig\Resolver\TemplateChain;
 
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Cache\ModuleCacheServiceInterface;
+use OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface;
 use OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface;
 use OxidEsales\Twig\Resolver\TemplateChain\TemplateChainResolverInterface;
 use Psr\Log\LoggerInterface;
@@ -32,16 +33,23 @@ final class PersistentTemplateChainResolver implements TemplateChainResolverInte
 
     private bool $shutdownRegistered = false;
 
+    private ?bool $enabled = null;
+
     public function __construct(
         private TemplateChainResolverInterface $inner,
         private ModuleCacheServiceInterface $moduleCacheService,
         private ContextInterface $context,
         private LoggerInterface $logger,
+        private ModuleSettingServiceInterface $moduleSettingService,
     ) {
     }
 
     public function getLastChild(string $templateName): string
     {
+        if (!$this->isEnabled()) {
+            return $this->inner->getLastChild($templateName);
+        }
+
         $this->loadLastChildCache();
 
         if (isset($this->lastChildCache[$templateName])) {
@@ -58,6 +66,10 @@ final class PersistentTemplateChainResolver implements TemplateChainResolverInte
 
     public function getParent(string $templateName): string
     {
+        if (!$this->isEnabled()) {
+            return $this->inner->getParent($templateName);
+        }
+
         $this->loadParentCache();
 
         if (isset($this->parentCache[$templateName])) {
@@ -74,6 +86,10 @@ final class PersistentTemplateChainResolver implements TemplateChainResolverInte
 
     public function hasParent(string $templateName): bool
     {
+        if (!$this->isEnabled()) {
+            return $this->inner->hasParent($templateName);
+        }
+
         $this->loadHasParentCache();
 
         if (array_key_exists($templateName, $this->hasParentCache)) {
@@ -145,6 +161,21 @@ final class PersistentTemplateChainResolver implements TemplateChainResolverInte
         register_shutdown_function(function (): void {
             $this->persist();
         });
+    }
+
+    private function isEnabled(): bool
+    {
+        if ($this->enabled === null) {
+            try {
+                $this->enabled = $this->moduleSettingService->getBoolean(
+                    'cacheTemplateChain',
+                    'oxs_module_performance'
+                );
+            } catch (\Throwable) {
+                $this->enabled = true;
+            }
+        }
+        return $this->enabled;
     }
 
     private function persist(): void

@@ -117,6 +117,26 @@ class WarmupModuleConfigurationCacheCommand extends Command
             $resolved,
             count($templates)
         ));
+
+        $this->clearWidgetCache($output);
+    }
+
+    private function clearWidgetCache(OutputInterface $output): void
+    {
+        $cacheDir = \OxidEsales\Eshop\Core\Registry::getConfig()->getConfigParam('sCompileDir') . '/widget_cache';
+
+        if (!is_dir($cacheDir)) {
+            $output->writeln('Widget cache: empty (nothing to clear)');
+            return;
+        }
+
+        $count = 0;
+        foreach (glob($cacheDir . '/*.html') as $file) {
+            unlink($file);
+            $count++;
+        }
+
+        $output->writeln(sprintf('Widget cache: cleared <info>%d</info> cached fragments', $count));
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidSupport\ModulePerformance\Twig\Loader;
 
+use OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface;
 use OxidEsales\Twig\Loader\FilesystemLoader as CoreFilesystemLoader;
 use OxidEsales\Twig\Resolver\TemplateDirectoryResolverAggregate;
 use Twig\Loader\LoaderInterface;
@@ -19,11 +20,14 @@ class FilesystemLoader extends CoreFilesystemLoader
     /** @var array<string, string> */
     private array $resolveCache = [];
 
+    private ?bool $enabled = null;
+
     public function __construct(
         private TemplateDirectoryResolverAggregate $templateDirectoryResolver,
-        private string $templateMapFile
+        private string $templateMapFile,
+        private ModuleSettingServiceInterface $moduleSettingService,
     ) {
-        if (is_file($this->templateMapFile)) {
+        if ($this->isEnabled() && is_file($this->templateMapFile)) {
             $map = require $this->templateMapFile;
             if (is_array($map)) {
                 $this->templateMap = $map;
@@ -35,7 +39,6 @@ class FilesystemLoader extends CoreFilesystemLoader
         // This allows different contexts to gradually contribute to the
         // same map file instead of the first one "locking" the contents.
         $this->templateMap = $this->buildMapAtRuntime($this->templateMap);
-
     }
 
     public function getSourceContext(string $name): Source
@@ -140,12 +143,29 @@ class FilesystemLoader extends CoreFilesystemLoader
             }
         }
 
-        @file_put_contents(
-            $this->templateMapFile,
-            '<?php return ' . var_export($map, true) . ';'
-        );
+        if ($this->isEnabled()) {
+            @file_put_contents(
+                $this->templateMapFile,
+                '<?php return ' . var_export($map, true) . ';'
+            );
+        }
 
         return $map;
+    }
+
+    private function isEnabled(): bool
+    {
+        if ($this->enabled === null) {
+            try {
+                $this->enabled = $this->moduleSettingService->getBoolean(
+                    'cacheTemplateMap',
+                    'oxs_module_performance'
+                );
+            } catch (\Throwable) {
+                $this->enabled = true;
+            }
+        }
+        return $this->enabled;
     }
 
     private function normalizeName(string $name): string
