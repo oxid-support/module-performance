@@ -8,50 +8,65 @@ Reduces TTFB with 30 active modules from ~4.8s to ~0.7s (after warmup).
     composer config repositories.oxs-module-performance vcs https://github.com/oxid-support/module-performance
     composer require oxid-support/module-performance
 
+    ./vendor/bin/oe-console oe:module:install oxid-support/module-performance
     ./vendor/bin/oe-console oe:module:activate oxs_module_performance
     ./vendor/bin/oe-console oxs:perf:warmup
 
 ## What gets cached
 
 ### Modules
-- **Configuration** — Serializes all YAML module configurations into a single cache file. Eliminates ~600ms of YAML parsing per request with 30 modules. File: `var/cache/modules/{shopId}/oxs_perf_module_configurations`
-- **Metadata** — Caches active module paths, controllers and class extensions via ModuleCacheService. Avoids re-resolving module metadata on every request.
-- **Settings** — Per-setting cache for module configuration values. Invalidates on save and dispatches `SettingChangedEvent`.
+
+| Cache | Beschreibung | Toggle |
+|---|---|---|
+| **Configuration** | Serialisiert alle YAML-Modul-Konfigurationen in eine Cache-Datei. Eliminiert ~600ms YAML-Parsing pro Request bei 30 Modulen. | immer aktiv |
+| **Settings** | Per-Setting-Cache für Modul-Konfigurationswerte. Invalidiert beim Speichern und dispatcht `SettingChangedEvent`. | immer aktiv |
+| **Metadata** | Cached aktive Modul-Pfade, Controller und Class-Extensions über ModuleCacheService. | `cacheModuleMetadata` |
 
 ### Templates
-- **Chain** — Persists chain resolution results (lastChild, parent, hasParent) via ModuleCacheService. Eliminates iterating over all modules x templates. Files: `var/cache/modules/{shopId}/oxs_perf_lastchild.txt` etc.
-- **Map** — Pre-computed map of all template paths, eliminating repeated directory scanning. Built automatically on first request. File: `source/tmp/template_map_shop_1.php`
-- **Directory Resolver** — In-memory cache for `getTemplateDirectories()`, which is called multiple times per request.
-- **Type Factory** — In-memory cache for `createFromTemplateName()`, which is called for every template.
-- **Twig Filters** — Exposes PHP functions (`parse_url`, `oxNew`, `strtotime`, `is_array`, `urlencode`, `addslashes`) as native Twig filters. Includes an optimized `getimagesize` that detects local files and uses filesystem instead of network access.
+
+| Cache | Beschreibung | Toggle |
+|---|---|---|
+| **Chain** | Persistiert Chain-Auflösung (lastChild, parent, hasParent) über ModuleCacheService. Eliminiert Iteration über alle Module x Templates. | `cacheTemplateChain` |
+| **Directories** | In-Memory-Cache für `getTemplateDirectories()`, das mehrfach pro Request aufgerufen wird. | `cacheTemplateDirectories` |
+| **Types** | In-Memory-Cache für `createFromTemplateName()`, das für jedes Template aufgerufen wird. | `cacheTemplateTypes` |
+| **Map** | Vorberechnete Map aller Template-Pfade als PHP-Datei. Eliminiert wiederholtes Verzeichnis-Scanning. | `cacheTemplateMap` |
+| **Widget-HTML** | Cached den HTML-Output statischer Widgets (nocookie) als Dateien. Umgeht den vollständigen Sub-Request pro Widget. | `cacheWidgetOutput` |
+| **ViewConfig** | Memoized `getViewThemeParam()`-Aufrufe innerhalb eines Requests. Verhindert redundante DB-Abfragen für Theme-Parameter. | `memoizeViewConfig` |
+| **Twig-Filter** | Stellt PHP-Funktionen (`parse_url`, `oxNew`, `strtotime`, `is_array`, `urlencode`, `addslashes`) als native Twig-Filter bereit. Optimiertes `getimagesize` nutzt Dateisystem statt Netzwerkzugriff. | — |
+
+## Admin-Einstellungen
+
+Alle Caches sind über den Admin unter **Erweiterungen → Module → Module Performance → Einstellungen** konfigurierbar. Die Einstellungen sind in zwei Gruppen aufgeteilt:
+
+- **Module** — Modul-Konfiguration (immer aktiv), Modul-Settings (immer aktiv), Modul-Metadaten
+- **Templates** — Template-Chain, Verzeichnisse, Typen, Map, Widget-HTML, ViewConfig
+
+Die beiden Kern-Caches (Konfiguration und Settings) sind immer aktiv und können nicht deaktiviert werden.
 
 ## Commands
 
 | Command | Description |
 |---|---|
-| `oxs:perf:warmup` | Warm up all caches (default) |
-| `oxs:perf:warmup --modules` | Module caches only (configuration, metadata, settings) |
-| `oxs:perf:warmup --templates` | Template caches only (chain, map) |
+| `./vendor/bin/oe-console oxs:perf:warmup` | Alle Caches neu aufbauen |
+| `./vendor/bin/oe-console oxs:perf:warmup --modules` | Modul-Konfiguration (YAML), Metadaten (Pfade, Controller, Class-Extensions) und Settings (Einzelwerte) |
+| `./vendor/bin/oe-console oxs:perf:warmup --templates` | Template-Map, Template-Chain und leert den Widget-Cache |
 
-For multishop setups, pass `--shop-id` to warm up a specific sub-shop:
+Für Multishop-Setups `--shop-id` angeben:
 
     ./vendor/bin/oe-console oxs:perf:warmup --shop-id=2
 
 ## Cache Invalidation
 
-Automatic on:
-- Module activation/deactivation (EventSubscriber)
-- Module setting changes (triggers `ModuleConfigurationChangedEvent`)
-- `oe:cache:clear` (deletes cache directory including module files)
+Automatisch bei:
+- Modul-Aktivierung/-Deaktivierung (EventSubscriber)
+- Modul-Setting-Änderungen (triggert `ModuleConfigurationChangedEvent`)
+- `oe:cache:clear` (löscht Cache-Verzeichnis inkl. Modul-Dateien)
 
-After invalidation the cache file is deleted and will not be recreated during the
-same request. The next regular request rebuilds the cache automatically, but only
-for the modules it actually uses. Running `oxs:perf:warmup` rebuilds all caches
-at once and avoids the slower first request.
+Nach Invalidierung wird die Cache-Datei gelöscht und im selben Request nicht neu erstellt. Der nächste reguläre Request baut den Cache automatisch auf, aber nur für die tatsächlich genutzten Module. `oxs:perf:warmup` baut alle Caches auf einmal neu auf und vermeidet den langsameren ersten Request.
 
-## Benchmark (30 modules)
+## Benchmark (30 Module)
 
-| Request | Without module | With module + warmup |
+| Request | Ohne Modul | Mit Modul + Warmup |
 |---|---|---|
 | Cold | ~4.8s | ~1.3s |
 | Warm | ~1.1s | ~0.7s |
