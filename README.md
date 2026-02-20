@@ -8,7 +8,6 @@ Reduces TTFB with 30 active modules from ~4.8s to ~0.7s (after warmup).
     composer config repositories.oxs-module-performance vcs https://github.com/oxid-support/module-performance
     composer require oxid-support/module-performance
 
-    ./vendor/bin/oe-console oe:module:install oxid-support/module-performance
     ./vendor/bin/oe-console oe:module:activate oxs_module_performance
     ./vendor/bin/oe-console oxs:perf:warmup
 
