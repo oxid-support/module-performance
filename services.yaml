@@ -1,6 +1,3 @@
-parameters:
-  oxid_esales.templating.template_map_file: '/var/www/html/source/tmp/template_map_shop_1.php'
-
 services:
   _defaults:
     autowire: false
@@ -15,7 +12,6 @@ services:
       $inner: '@.inner'
       $moduleCacheService: '@OxidEsales\EshopCommunity\Internal\Framework\Module\Cache\ModuleCacheServiceInterface'
       $context: '@OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface'
-      $logger: '@Psr\Log\LoggerInterface'
       $moduleSettingService: '@OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface'
 
   # 2. Cached module directory resolver (memoize per request)
@@ -39,7 +35,6 @@ services:
     arguments:
       $inner: '@.inner'
       $context: '@OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface'
-      $logger: '@Psr\Log\LoggerInterface'
     tags:
       - { name: kernel.event_subscriber }
 
@@ -63,6 +58,7 @@ services:
     arguments:
       $inner: '@.inner'
       $moduleSettingService: '@OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface'
+      $context: '@OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface'
 
   # 7. Twig-Filter: PHP-Funktionen + optimiertes getimagesize
   OxidSupport\ModulePerformance\Twig\Extensions\Filters\PhpFunctionsPerformanceExtension:
@@ -73,8 +69,8 @@ services:
     class: OxidSupport\ModulePerformance\Twig\Loader\FilesystemLoader
     arguments:
       $templateDirectoryResolver: '@OxidEsales\Twig\Resolver\TemplateDirectoryResolverInterface'
-      $templateMapFile: '%oxid_esales.templating.template_map_file%'
       $moduleSettingService: '@OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface'
+      $context: '@OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface'
     tags: ['twig.loader']
 
   # 8. Cached Modul-Metadaten (Pfade, Controller, Class-Extensions)

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidSupport\ModulePerformance\Twig\Resolver\TemplateChain;
 
+use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Cache\ModuleCacheServiceInterface;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface;
 use OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface;
@@ -39,9 +40,17 @@ final class PersistentTemplateChainResolver implements TemplateChainResolverInte
         private TemplateChainResolverInterface $inner,
         private ModuleCacheServiceInterface $moduleCacheService,
         private ContextInterface $context,
-        private LoggerInterface $logger,
         private ModuleSettingServiceInterface $moduleSettingService,
     ) {
+    }
+
+    private function getLogger(): ?LoggerInterface
+    {
+        try {
+            return ContainerFactory::getInstance()->getContainer()->get(LoggerInterface::class);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     public function getLastChild(string $templateName): string
@@ -119,7 +128,7 @@ final class PersistentTemplateChainResolver implements TemplateChainResolverInte
         try {
             $this->lastChildCache = $this->moduleCacheService->get(self::KEY_LASTCHILD, $this->getShopId());
         } catch (\Throwable $e) {
-            $this->logger->warning('ModulePerformance: Failed to load lastChild cache', ['exception' => $e->getMessage()]);
+            $this->getLogger()?->warning('ModulePerformance: Failed to load lastChild cache', ['exception' => $e->getMessage()]);
         }
     }
 
@@ -133,7 +142,7 @@ final class PersistentTemplateChainResolver implements TemplateChainResolverInte
         try {
             $this->parentCache = $this->moduleCacheService->get(self::KEY_PARENT, $this->getShopId());
         } catch (\Throwable $e) {
-            $this->logger->warning('ModulePerformance: Failed to load parent cache', ['exception' => $e->getMessage()]);
+            $this->getLogger()?->warning('ModulePerformance: Failed to load parent cache', ['exception' => $e->getMessage()]);
         }
     }
 
@@ -147,7 +156,7 @@ final class PersistentTemplateChainResolver implements TemplateChainResolverInte
         try {
             $this->hasParentCache = $this->moduleCacheService->get(self::KEY_HASPARENT, $this->getShopId());
         } catch (\Throwable $e) {
-            $this->logger->warning('ModulePerformance: Failed to load hasParent cache', ['exception' => $e->getMessage()]);
+            $this->getLogger()?->warning('ModulePerformance: Failed to load hasParent cache', ['exception' => $e->getMessage()]);
         }
     }
 
@@ -193,7 +202,7 @@ final class PersistentTemplateChainResolver implements TemplateChainResolverInte
                 $this->moduleCacheService->put(self::KEY_HASPARENT, $shopId, $this->hasParentCache);
             }
         } catch (\Throwable $e) {
-            $this->logger->error('ModulePerformance: Failed to persist cache', ['exception' => $e->getMessage()]);
+            $this->getLogger()?->error('ModulePerformance: Failed to persist cache', ['exception' => $e->getMessage()]);
         }
     }
 }

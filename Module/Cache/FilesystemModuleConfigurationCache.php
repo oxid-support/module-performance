@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace OxidSupport\ModulePerformance\Module\Cache;
 
+use OxidEsales\EshopCommunity\Internal\Container\ContainerFactory;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Cache\ModuleConfigurationCacheInterface;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\DataObject\ModuleConfiguration;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Configuration\Event\ModuleConfigurationChangedEvent;
@@ -46,7 +47,7 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
  *
  * ## File location
  *
- * /var/www/var/cache/modules/{shopId}/oxs_perf_module_configurations
+ * {sCompileDir}/modules/{shopId}/oxs_perf_module_configurations
  */
 class FilesystemModuleConfigurationCache implements ModuleConfigurationCacheInterface, EventSubscriberInterface
 {
@@ -62,9 +63,17 @@ class FilesystemModuleConfigurationCache implements ModuleConfigurationCacheInte
     public function __construct(
         private ModuleConfigurationCacheInterface $inner,
         private ContextInterface $context,
-        private LoggerInterface $logger,
     ) {
         register_shutdown_function([$this, 'persist']);
+    }
+
+    private function getLogger(): ?LoggerInterface
+    {
+        try {
+            return ContainerFactory::getInstance()->getContainer()->get(LoggerInterface::class);
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     public static function getSubscribedEvents(): array
@@ -99,7 +108,7 @@ class FilesystemModuleConfigurationCache implements ModuleConfigurationCacheInte
                 unlink($cacheFile);
             }
         } catch (\Throwable $e) {
-            $this->logger->warning('ModulePerformance: Failed to delete module configuration cache file', [
+            $this->getLogger()?->warning('ModulePerformance: Failed to delete module configuration cache file', [
                 'exception' => $e->getMessage(),
             ]);
         }
@@ -178,7 +187,7 @@ class FilesystemModuleConfigurationCache implements ModuleConfigurationCacheInte
 
             $this->dirty = false;
         } catch (\Throwable $e) {
-            $this->logger->error('ModulePerformance: Failed to persist module configuration cache', [
+            $this->getLogger()?->error('ModulePerformance: Failed to persist module configuration cache', [
                 'exception' => $e->getMessage(),
             ]);
         }
@@ -219,7 +228,7 @@ class FilesystemModuleConfigurationCache implements ModuleConfigurationCacheInte
                 }
             }
         } catch (\Throwable $e) {
-            $this->logger->warning('ModulePerformance: Failed to load module configuration cache', [
+            $this->getLogger()?->warning('ModulePerformance: Failed to load module configuration cache', [
                 'exception' => $e->getMessage(),
             ]);
             $this->memory = [];
@@ -229,7 +238,8 @@ class FilesystemModuleConfigurationCache implements ModuleConfigurationCacheInte
     private function getCacheFilePath(): string
     {
         $shopId = $this->context->getCurrentShopId();
-
-        return '/var/www/var/cache/modules/' . $shopId . '/' . self::CACHE_KEY;
+        $compileDir = \OxidEsales\Eshop\Core\Registry::getConfig()->getConfigParam('sCompileDir');
+        $path = rtrim($compileDir, DIRECTORY_SEPARATOR) . '/modules/' . $shopId . '/' . self::CACHE_KEY;
+        return $path;
     }
 }

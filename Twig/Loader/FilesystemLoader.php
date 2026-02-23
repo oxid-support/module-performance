@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace OxidSupport\ModulePerformance\Twig\Loader;
 
+use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface;
+use OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface;
 use OxidEsales\Twig\Loader\FilesystemLoader as CoreFilesystemLoader;
 use OxidEsales\Twig\Resolver\TemplateDirectoryResolverAggregate;
 use Twig\Loader\LoaderInterface;
@@ -21,12 +23,19 @@ class FilesystemLoader extends CoreFilesystemLoader
     private array $resolveCache = [];
 
     private ?bool $enabled = null;
+    private string $templateMapFile;
 
     public function __construct(
         private TemplateDirectoryResolverAggregate $templateDirectoryResolver,
-        private string $templateMapFile,
         private ModuleSettingServiceInterface $moduleSettingService,
+        private ContextInterface $context,
     ) {
+        parent::__construct($templateDirectoryResolver);
+
+        $compileDir = Registry::getConfig()->getConfigParam('sCompileDir');
+        $shopId = $this->context->getCurrentShopId();
+        $this->templateMapFile = rtrim($compileDir, DIRECTORY_SEPARATOR)
+            . DIRECTORY_SEPARATOR . 'template_map_shop_' . $shopId . '.php';
         if ($this->isEnabled() && is_file($this->templateMapFile)) {
             $map = require $this->templateMapFile;
             if (is_array($map)) {

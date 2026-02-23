@@ -123,8 +123,7 @@ class WarmupModuleConfigurationCacheCommand extends Command
 
     private function clearWidgetCache(OutputInterface $output): void
     {
-        $cacheDir = \OxidEsales\Eshop\Core\Registry::getConfig()->getConfigParam('sCompileDir') . '/widget_cache';
-
+        $cacheDir = rtrim(\OxidEsales\Eshop\Core\Registry::getConfig()->getConfigParam('sCompileDir'), DIRECTORY_SEPARATOR) . '/widget_cache';
         if (!is_dir($cacheDir)) {
             $output->writeln('Widget cache: empty (nothing to clear)');
             return;

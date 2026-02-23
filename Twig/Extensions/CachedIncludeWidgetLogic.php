@@ -7,6 +7,7 @@ namespace OxidSupport\ModulePerformance\Twig\Extensions;
 use OxidEsales\Eshop\Core\Registry;
 use OxidEsales\EshopCommunity\Internal\Framework\Module\Facade\ModuleSettingServiceInterface;
 use OxidEsales\EshopCommunity\Internal\Transition\Adapter\TemplateLogic\IncludeWidgetLogic;
+use OxidEsales\EshopCommunity\Internal\Transition\Utility\ContextInterface;
 
 /**
  * Caches HTML output of static widgets (nocookie: 1).
@@ -25,14 +26,19 @@ class CachedIncludeWidgetLogic extends IncludeWidgetLogic
 
     private IncludeWidgetLogic $inner;
     private ModuleSettingServiceInterface $moduleSettingService;
+    private ContextInterface $context;
     private string $cacheDir;
     private ?bool $enabled = null;
 
-    public function __construct(IncludeWidgetLogic $inner, ModuleSettingServiceInterface $moduleSettingService)
-    {
+    public function __construct(
+        IncludeWidgetLogic $inner,
+        ModuleSettingServiceInterface $moduleSettingService,
+        ContextInterface $context,
+    ) {
         $this->inner = $inner;
         $this->moduleSettingService = $moduleSettingService;
-        $this->cacheDir = Registry::getConfig()->getConfigParam('sCompileDir') . '/widget_cache';
+        $this->context = $context;
+        $this->cacheDir = rtrim(Registry::getConfig()->getConfigParam('sCompileDir'), DIRECTORY_SEPARATOR) . '/widget_cache';
     }
 
     public function renderWidget(array $params)
@@ -85,7 +91,7 @@ class CachedIncludeWidgetLogic extends IncludeWidgetLogic
     private function buildCacheKey(array $params): string
     {
         $langId = Registry::getLang()->getBaseLanguage();
-        $shopId = Registry::getConfig()->getShopId();
+        $shopId = $this->context->getCurrentShopId();
 
         ksort($params);
 
