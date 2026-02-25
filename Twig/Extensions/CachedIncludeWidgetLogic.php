@@ -41,7 +41,7 @@ class CachedIncludeWidgetLogic extends IncludeWidgetLogic
         $this->cacheDir = rtrim(Registry::getConfig()->getConfigParam('sCompileDir'), DIRECTORY_SEPARATOR) . '/widget_cache';
     }
 
-    public function renderWidget(array $params)
+public function renderWidget(array $params)
     {
         if (empty($params['nocookie']) || !$this->isEnabled()) {
             return $this->inner->renderWidget($params);
@@ -50,7 +50,8 @@ class CachedIncludeWidgetLogic extends IncludeWidgetLogic
         $cacheKey = $this->buildCacheKey($params);
 
         if (isset(self::$memoryCache[$cacheKey])) {
-            return self::$memoryCache[$cacheKey];
+            echo self::$memoryCache[$cacheKey];
+            return;
         }
 
         $cacheFile = $this->cacheDir . '/' . $cacheKey . '.html';
@@ -58,10 +59,13 @@ class CachedIncludeWidgetLogic extends IncludeWidgetLogic
         if (file_exists($cacheFile)) {
             $html = file_get_contents($cacheFile);
             self::$memoryCache[$cacheKey] = $html;
-            return $html;
+            echo $html;
+            return;
         }
 
-        $html = $this->inner->renderWidget($params);
+        ob_start();
+        $this->inner->renderWidget($params);
+        $html = ob_get_clean();
 
         if (!is_dir($this->cacheDir)) {
             @mkdir($this->cacheDir, 0775, true);
@@ -70,7 +74,7 @@ class CachedIncludeWidgetLogic extends IncludeWidgetLogic
         file_put_contents($cacheFile, $html);
         self::$memoryCache[$cacheKey] = $html;
 
-        return $html;
+        echo $html;
     }
 
     private function isEnabled(): bool
